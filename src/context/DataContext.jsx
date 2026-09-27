@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { initialRooms, initialCustomers, initialBookings, initialPayments } from '../data/seedData';
 import { v4 as uuidv4 } from 'uuid';
@@ -7,52 +7,77 @@ import { differenceInDays, parseISO } from 'date-fns';
 const DataContext = createContext(null);
 
 export const DataProvider = ({ children }) => {
-  const [rooms, setRooms] = useLocalStorage('hotel_rooms', initialRooms);
-  const [customers, setCustomers] = useLocalStorage('hotel_customers', initialCustomers);
-  const [bookings, setBookings] = useLocalStorage('hotel_bookings', initialBookings);
-  const [payments, setPayments] = useLocalStorage('hotel_payments', initialPayments);
+  const [rooms, setRooms] = useLocalStorage('hotel_rooms_v6', initialRooms);
+  const [customers, setCustomers] = useLocalStorage('hotel_customers_v2', initialCustomers);
+  const [bookings, setBookings] = useLocalStorage('hotel_bookings_v2', initialBookings);
+  const [payments, setPayments] = useLocalStorage('hotel_payments_v2', initialPayments);
+  
+  // Auth State
+  const [currentUser, setCurrentUser] = useLocalStorage('hotel_current_user', null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authMode, setAuthMode] = useState('login');
+
+  useEffect(() => {
+    // Fetch bookings from database on initial load
+    const fetchBookings = async () => {
+      try {
+        const response = await fetch('http://localhost:5000/api/bookings');
+        if (response.ok) {
+          const data = await response.json();
+          // Map MongoDB _id if needed, but the backend also has our custom id field
+          if (data && data.length > 0) {
+            setBookings(data);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching bookings from DB:', error);
+      }
+    };
+    
+    fetchBookings();
+  }, []);
 
   // --- Rooms ---
   const addRoom = (roomData) => {
     const newRoom = { ...roomData, id: uuidv4() };
-    setRooms([...rooms, newRoom]);
+    setRooms(prev => [...prev, newRoom]);
   };
 
   const updateRoom = (id, updatedData) => {
-    setRooms(rooms.map(room => (room.id === id ? { ...room, ...updatedData } : room)));
+    setRooms(prev => prev.map(room => (room.id === id ? { ...room, ...updatedData } : room)));
   };
 
   const deleteRoom = (id) => {
-    setRooms(rooms.filter(room => room.id !== id));
+    setRooms(prev => prev.filter(room => room.id !== id));
   };
 
   const updateRoomStatus = (id, status) => {
-    setRooms(rooms.map(room => (room.id === id ? { ...room, status } : room)));
+    setRooms(prev => prev.map(room => (room.id === id ? { ...room, status } : room)));
   };
 
   // --- Customers ---
   const addCustomer = (customerData) => {
     const newCustomer = { ...customerData, id: `CUST-${Math.floor(Math.random() * 10000)}`, bookingsCount: 0 };
-    setCustomers([...customers, newCustomer]);
+    setCustomers(prev => [...prev, newCustomer]);
     return newCustomer.id;
   };
 
   const updateCustomer = (id, updatedData) => {
-    setCustomers(customers.map(cust => (cust.id === id ? { ...cust, ...updatedData } : cust)));
+    setCustomers(prev => prev.map(cust => (cust.id === id ? { ...cust, ...updatedData } : cust)));
   };
 
   const deleteCustomer = (id) => {
-    setCustomers(customers.filter(cust => cust.id !== id));
+    setCustomers(prev => prev.filter(cust => cust.id !== id));
   };
 
   const incrementCustomerBookingCount = (id) => {
-    setCustomers(customers.map(cust => 
+    setCustomers(prev => prev.map(cust => 
       cust.id === id ? { ...cust, bookingsCount: cust.bookingsCount + 1 } : cust
     ));
   };
 
   // --- Bookings ---
-  const addBooking = (bookingData) => {
+  const addBooking = async (bookingData) => {
     const { checkInDate, checkOutDate, roomId } = bookingData;
     
     // Check if room is available for these dates (simplified logic, just checking current status for demo)
@@ -76,15 +101,35 @@ export const DataProvider = ({ children }) => {
       paymentStatus: 'Pending',
     };
 
-    setBookings([...bookings, newBooking]);
-    updateRoomStatus(roomId, 'Reserved');
+    try {
+      const response = await fetch('http://localhost:5000/api/bookings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newBooking),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save booking to database');
+      }
+
+      const savedBooking = await response.json();
+      console.log('Booking saved to MongoDB:', savedBooking);
+    } catch (error) {
+      console.error('Error saving booking to DB:', error);
+      // We will still save it to local storage as fallback for the UI to work smoothly
+    }
+
+    setBookings(prev => [...prev, newBooking]);
+    // Removed updateRoomStatus(roomId, 'Reserved') to allow multiple bookings for the same room type
     incrementCustomerBookingCount(bookingData.customerId);
     
     return newBooking;
   };
 
   const updateBookingStatus = (id, status) => {
-    setBookings(bookings.map(bkg => bkg.id === id ? { ...bkg, status } : bkg));
+    setBookings(prev => prev.map(bkg => bkg.id === id ? { ...bkg, status } : bkg));
   };
 
   // --- Check-in / Check-out Logic ---
@@ -118,14 +163,10 @@ export const DataProvider = ({ children }) => {
       ...paymentData,
       id: `PAY-${Math.floor(Math.random() * 10000) + 2000}`,
     };
-    setPayments([...payments, newPayment]);
+    setPayments(prev => [...prev, newPayment]);
 
     // Update booking payment status
-    const booking = bookings.find(b => b.id === paymentData.bookingId);
-    if (booking) {
-      // In a real app, calculate if full amount is paid
-      setBookings(bookings.map(bkg => bkg.id === booking.id ? { ...bkg, paymentStatus: 'Paid' } : bkg));
-    }
+    setBookings(prev => prev.map(bkg => bkg.id === paymentData.bookingId ? { ...bkg, paymentStatus: 'Paid' } : bkg));
   };
 
 
@@ -152,7 +193,10 @@ export const DataProvider = ({ children }) => {
     addCustomer, updateCustomer, deleteCustomer,
     addBooking, updateBookingStatus, checkIn, checkOut, cancelBooking,
     addPayment,
-    stats
+    stats,
+    currentUser, setCurrentUser,
+    isAuthModalOpen, setIsAuthModalOpen,
+    authMode, setAuthMode
   };
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

@@ -19,13 +19,14 @@ const staggerContainer = {
 };
 
 const Home = () => {
-  const { rooms } = useData();
+  const { rooms, addCustomer, addBooking, addPayment, currentUser, setIsAuthModalOpen, setAuthMode } = useData();
   
-  const [bookingData, setBookingData] = useState({
-    checkIn: '',
-    checkOut: '',
-    guests: '2',
-    roomType: 'All'
+  const [formData, setFormData] = useState({
+    firstName: 'Aman',
+    lastName: 'Kumar',
+    email: 'amankr698891@gmail.com',
+    checkIn: new Date().toISOString().split('T')[0],
+    checkOut: new Date(Date.now() + 86400000).toISOString().split('T')[0],
   });
 
   const [selectedRoom, setSelectedRoom] = useState(null);
@@ -33,20 +34,64 @@ const Home = () => {
   const [paymentSuccess, setPaymentSuccess] = useState(false);
 
   const handleBookRoom = (room) => {
+    if (!currentUser) {
+      setAuthMode('login');
+      setIsAuthModalOpen(true);
+      return;
+    }
     setSelectedRoom(room);
     setPaymentSuccess(false);
+  };
+
+  const handleFormChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handlePayment = (e) => {
     e.preventDefault();
     setIsProcessingPayment(true);
-    setTimeout(() => {
-      setIsProcessingPayment(false);
-      setPaymentSuccess(true);
-      setTimeout(() => {
-        setSelectedRoom(null);
-        setPaymentSuccess(false);
-      }, 3000);
+    
+    setTimeout(async () => {
+      try {
+        // 1. Create Customer
+        const customerId = addCustomer({
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          email: formData.email,
+          phone: 'N/A' // Mock phone
+        });
+
+        // 2. Create Booking
+        const booking = await addBooking({
+          customerId,
+          guestName: `${formData.firstName} ${formData.lastName}`,
+          guestEmail: formData.email,
+          roomId: selectedRoom.id,
+          checkInDate: formData.checkIn,
+          checkOutDate: formData.checkOut,
+          guests: 2, // Default
+        });
+
+        // 3. Create Payment
+        addPayment({
+          bookingId: booking.id,
+          amount: booking.totalAmount,
+          method: 'Credit Card',
+          status: 'Completed',
+          date: new Date().toISOString()
+        });
+
+        setIsProcessingPayment(false);
+        setPaymentSuccess(true);
+        setTimeout(() => {
+          setSelectedRoom(null);
+          setPaymentSuccess(false);
+        }, 3000);
+      } catch (error) {
+        alert(error.message);
+        setIsProcessingPayment(false);
+      }
     }, 1500);
   };
 
@@ -55,7 +100,17 @@ const Home = () => {
     alert('Search functionality would redirect to booking engine with these params!');
   };
 
-  const featuredRooms = rooms.filter(r => r.status === 'Available');
+  // Get unique room types that have at least one available room
+  const availableRooms = rooms.filter(r => r.status === 'Available');
+  const featuredRooms = [];
+  const seenTypes = new Set();
+  
+  for (const room of availableRooms) {
+    if (!seenTypes.has(room.type)) {
+      seenTypes.add(room.type);
+      featuredRooms.push(room);
+    }
+  }
 
   return (
     <div className="w-full overflow-hidden">
@@ -87,7 +142,7 @@ const Home = () => {
             <a href="#rooms" className="w-full sm:w-auto px-8 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-sm font-semibold transition-colors uppercase tracking-wider text-sm shadow-lg text-center">
               Explore Rooms
             </a>
-            <a href="#book" className="w-full sm:w-auto px-8 py-3 bg-white hover:bg-gray-100 text-[#102a43] rounded-sm font-semibold transition-colors uppercase tracking-wider text-sm shadow-lg text-center">
+            <a href="#rooms" className="w-full sm:w-auto px-8 py-3 bg-white hover:bg-gray-100 text-[#102a43] rounded-sm font-semibold transition-colors uppercase tracking-wider text-sm shadow-lg text-center">
               Book Your Stay
             </a>
           </motion.div>
@@ -126,6 +181,10 @@ const Home = () => {
                       alt={`${room.type} Room`} 
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />
+                    <div className="absolute top-4 left-4 bg-emerald-500/95 backdrop-blur px-3 py-1 rounded-sm text-sm font-bold text-white shadow-md border border-emerald-400 flex items-center gap-1.5">
+                      <CheckCircle2 size={16} />
+                      Available
+                    </div>
                     <div className="absolute top-4 right-4 bg-white/95 backdrop-blur px-3 py-1 rounded-sm text-sm font-bold text-[#102a43] shadow-md border border-white/20">
                       {formatCurrency(room.price)} <span className="text-xs font-normal text-gray-500">/ night</span>
                     </div>
@@ -450,12 +509,26 @@ const Home = () => {
                 
                 <form onSubmit={handlePayment} className="p-6 space-y-4">
                   <div className="space-y-3">
+                    <h4 className="font-semibold text-sm text-gray-900 uppercase tracking-wider mb-2 border-b pb-2">Stay Details</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                       <div>
+                         <label className="text-xs text-gray-500 font-medium mb-1 block">Check-in</label>
+                         <input type="date" name="checkIn" value={formData.checkIn} onChange={handleFormChange} required className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#102a43]" />
+                       </div>
+                       <div>
+                         <label className="text-xs text-gray-500 font-medium mb-1 block">Check-out</label>
+                         <input type="date" name="checkOut" value={formData.checkOut} onChange={handleFormChange} required className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#102a43]" />
+                       </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 pt-2">
                     <h4 className="font-semibold text-sm text-gray-900 uppercase tracking-wider mb-2 border-b pb-2">Guest Details</h4>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <input type="text" placeholder="First Name" defaultValue="Aman" className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#102a43]" />
-                      <input type="text" placeholder="Last Name" defaultValue="Kumar" className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#102a43]" />
+                      <input type="text" name="firstName" value={formData.firstName} onChange={handleFormChange} placeholder="First Name" required className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#102a43]" />
+                      <input type="text" name="lastName" value={formData.lastName} onChange={handleFormChange} placeholder="Last Name" required className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#102a43]" />
                     </div>
-                    <input type="email" placeholder="Email Address" defaultValue="amankr698891@gmail.com" className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#102a43]" />
+                    <input type="email" name="email" value={formData.email} onChange={handleFormChange} placeholder="Email Address" required className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#102a43]" />
                   </div>
                   
                   <div className="space-y-3 pt-2">
@@ -473,7 +546,12 @@ const Home = () => {
                   <div className="pt-4 mt-2 border-t">
                     <div className="flex justify-between items-center mb-4 text-sm">
                       <span className="font-medium text-gray-600">Total Amount:</span>
-                      <span className="font-bold text-xl text-gray-900">{formatCurrency(selectedRoom.price)}</span>
+                      <span className="font-bold text-xl text-gray-900">
+                        {(() => {
+                           const days = Math.max(1, Math.ceil((new Date(formData.checkOut) - new Date(formData.checkIn)) / (1000 * 60 * 60 * 24)));
+                           return formatCurrency(selectedRoom.price * days);
+                        })()}
+                      </span>
                     </div>
                     <button 
                       type="submit" 
