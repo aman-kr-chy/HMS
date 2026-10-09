@@ -93,24 +93,6 @@ const PublicFooter = () => {
           </div>
         </div>
 
-        {/* Project Team Highlight */}
-        <div className="mb-10 p-6 border border-amber-500/30 rounded-xl bg-amber-500/5 flex flex-col items-center justify-center text-center">
-          <h4 className="text-amber-500 font-bold uppercase tracking-[0.2em] text-sm mb-4">Developed By</h4>
-          <div className="flex flex-wrap justify-center gap-x-8 gap-y-4">
-            <div className="flex flex-col items-center">
-              <span className="text-white font-semibold text-lg">Amarditya Kumar</span>
-              <span className="text-amber-500 text-xs font-bold uppercase tracking-wider mt-1 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20">Leader</span>
-            </div>
-            <div className="flex flex-col items-center">
-              <span className="text-white/90 font-medium text-lg">Harsh kumar</span>
-              <span className="text-white/50 text-xs font-bold uppercase tracking-wider mt-1 px-2 py-0.5 rounded-full bg-white/5 border border-white/10">Member</span>
-            </div>
-            <div className="flex flex-col items-center">
-              <span className="text-white/90 font-medium text-lg">Vikalp kumar</span>
-              <span className="text-white/50 text-xs font-bold uppercase tracking-wider mt-1 px-2 py-0.5 rounded-full bg-white/5 border border-white/10">Member</span>
-            </div>
-          </div>
-        </div>
 
         <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-white/50">
           <p>&copy; {new Date().getFullYear()} GrandHotel. All rights reserved.</p>
