@@ -64,7 +64,7 @@ const PublicFooter = () => {
               </li>
               <li className="flex items-center gap-3">
                 <Phone size={18} className="text-amber-500 shrink-0" />
-                <span>+91 7481 986 648</span>
+                <span>+91 8969698891</span>
               </li>
               <li className="flex items-center gap-3">
                 <Mail size={18} className="text-amber-500 shrink-0" />

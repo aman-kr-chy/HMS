@@ -14,7 +14,7 @@ const PublicLayout = () => {
 
       {/* Floating WhatsApp Bubble */}
       <a
-        href="https://wa.me/917481986648"
+        href="https://wa.me/918969698891"
         target="_blank"
         rel="noopener noreferrer"
         className="fixed bottom-6 right-6 w-14 h-14 bg-[#25D366] text-white rounded-full flex items-center justify-center shadow-[0_4px_14px_rgba(37,211,102,0.4)] hover:bg-[#128C7E] hover:-translate-y-1 hover:scale-110 transition-all duration-300 z-50 group"
